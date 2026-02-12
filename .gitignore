@@ -12,6 +12,9 @@ env/
 *.db
 instance/
 
+# Firebase credentials
+firebase-credentials.json
+
 # Uploads folder (user uploaded files)
 uploads/
 
