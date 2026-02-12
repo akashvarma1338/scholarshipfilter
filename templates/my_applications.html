@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Applications - Scholarship Eligibility Filter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .page-header { background: linear-gradient(135deg, #667eea, #764ba2); padding: 40px; border-radius: 16px; color: white; margin-bottom: 30px; }
+        .page-header h2 { margin: 0 0 10px 0; }
+        .page-header p { opacity: 0.9; margin: 0; }
+        .applications-grid { display: grid; gap: 20px; }
+        .application-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .app-info h4 { margin: 0 0 8px 0; color: #1e293b; font-size: 1.1rem; }
+        .app-info p { margin: 0; color: #64748b; font-size: 0.9rem; }
+        .app-amount { color: #10b981; font-weight: 600; font-size: 1.1rem; }
+        .status-badge { padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-under_review { background: #dbeafe; color: #1e40af; }
+        .status-approved { background: #d1fae5; color: #065f46; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+        .empty-state { text-align: center; padding: 60px 20px; background: #f8fafc; border-radius: 16px; }
+        .empty-state .icon { font-size: 4rem; margin-bottom: 20px; }
+        .empty-state h3 { color: #1e293b; margin-bottom: 10px; }
+        .empty-state p { color: #64748b; margin-bottom: 20px; }
+        .empty-state a { display: inline-block; padding: 12px 24px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-weight: 500; }
+        .empty-state a:hover { background: #4338ca; }
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; color: #6366f1; text-decoration: none; margin-bottom: 20px; font-weight: 500; }
+        .back-btn:hover { text-decoration: underline; }
+        .applied-date { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">🎓</span>
+            <h1>Scholarship Eligibility Filter</h1>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/">Apply</a></li>
+            <li><a href="{{ url_for('my_applications') }}" class="active">My Applications</a></li>
+            <li><a href="/dashboard">Dashboard</a></li>
+        </ul>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            {% if session.student_picture %}
+            <img src="{{ session.student_picture }}" alt="Profile" style="width: 35px; height: 35px; border-radius: 50%; border: 2px solid #4f46e5;">
+            {% endif %}
+            <span style="color: #374151; font-weight: 500;">{{ session.student_name }}</span>
+            <a href="{{ url_for('student_logout') }}" style="background: #fee2e2; color: #991b1b; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; text-decoration: none; font-weight: 500;">🚪 Logout</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <a href="{{ url_for('index') }}" class="back-btn">← Back to Home</a>
+        
+        <div class="page-header">
+            <h2>📋 My Scholarship Applications</h2>
+            <p>Track the status of your scholarship applications</p>
+        </div>
+        
+        <div class="applications-grid" id="applicationsList">
+            <div class="loading">Loading your applications...</div>
+        </div>
+    </main>
+    
+    <!-- Document Upload Modal -->
+    <div class="modal" id="uploadModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📤 Upload Documents</h3>
+                <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+            </div>
+            <div id="adminFeedback" class="admin-feedback"></div>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="hidden" id="uploadAppId" value="">
+                <div class="form-group">
+                    <label>Document Type</label>
+                    <select id="documentType" class="form-select">
+                        <option value="Income Certificate">Income Certificate</option>
+                        <option value="Marksheet">Marksheet</option>
+                        <option value="Caste Certificate">Caste Certificate</option>
+                        <option value="Bonafide Certificate">Bonafide Certificate</option>
+                        <option value="Aadhar Card">Aadhar Card</option>
+                        <option value="Bank Passbook">Bank Passbook</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Select File (PDF, JPG, PNG, DOC - Max 5MB)</label>
+                    <input type="file" id="documentFile" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" class="file-input">
+                </div>
+                <button type="submit" class="btn btn-primary">📤 Upload Document</button>
+            </form>
+            <div id="uploadedDocs" class="uploaded-docs"></div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>© 2024 Scholarship Eligibility Filter | Built with ❤️ for Education</p>
+    </footer>
+    
+    <style>
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: white; border-radius: 16px; padding: 30px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; color: #374151; }
+        .form-select, .file-input { width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; }
+        .form-select:focus, .file-input:focus { outline: none; border-color: #6366f1; }
+        .admin-feedback { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 10px; padding: 15px; margin-bottom: 20px; }
+        .admin-feedback h5 { margin: 0 0 8px 0; color: #92400e; }
+        .admin-feedback p { margin: 0; color: #78350f; }
+        .uploaded-docs { margin-top: 20px; }
+        .uploaded-docs h4 { margin-bottom: 10px; color: #374151; }
+        .doc-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 8px; }
+        .doc-info { display: flex; align-items: center; gap: 10px; }
+        .doc-icon { font-size: 1.2rem; }
+        .doc-name { font-weight: 500; font-size: 0.9rem; }
+        .doc-badge { background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+        .feedback-alert { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 0 8px 8px 0; margin-top: 15px; }
+        .feedback-alert h5 { margin: 0 0 5px 0; color: #92400e; display: flex; align-items: center; gap: 8px; }
+        .feedback-alert p { margin: 0; color: #78350f; font-size: 0.9rem; }
+        .btn-upload { background: #8b5cf6; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
+        .btn-upload:hover { background: #7c3aed; }
+        .notification-dot { display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; margin-left: 5px; }
+    </style>
+
+    <script>
+        let currentUploadAppId = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadApplications();
+            
+            document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await uploadDocument();
+            });
+        });
+        
+        async function loadApplications() {
+            const container = document.getElementById('applicationsList');
+            
+            try {
+                const response = await fetch('/api/applications/my');
+                const data = await response.json();
+                
+                if (data.success && data.applications.length > 0) {
+                    container.innerHTML = data.applications.map(app => `
+                        <div class="application-card">
+                            <div class="app-info">
+                                <h4>${app.scholarship_name}</h4>
+                                <p class="app-amount">₹${app.scholarship_amount?.toLocaleString() || 'N/A'}</p>
+                                <p class="applied-date">Applied: ${formatDate(app.applied_at)}</p>
+                                ${app.admin_notes ? `<p style="margin-top: 8px; color: #6366f1;"><strong>Admin Note:</strong> ${app.admin_notes}</p>` : ''}
+                                
+                                ${app.documents_requested && app.admin_feedback ? `
+                                <div class="feedback-alert">
+                                    <h5>📝 Documents Requested ${!app.feedback_read ? '<span class="notification-dot"></span>' : ''}</h5>
+                                    <p>${app.admin_feedback}</p>
+                                    <button class="btn-upload" style="margin-top: 10px;" onclick="openUploadModal(${app.id}, '${escapeHtml(app.admin_feedback)}')">
+                                        📤 Upload Documents
+                                    </button>
+                                </div>
+                                ` : ''}
+                                
+                                ${app.document_count > 0 ? `<p style="margin-top: 8px; color: #10b981;">📎 ${app.document_count} document(s) uploaded</p>` : ''}
+                            </div>
+                            <span class="status-badge status-${app.status}">
+                                ${getStatusLabel(app.status)}
+                            </span>
+                        </div>
+                    `).join('');
+                    
+                    // Mark feedback as read for displayed applications
+                    data.applications.filter(a => a.documents_requested && !a.feedback_read).forEach(app => {
+                        markFeedbackRead(app.id);
+                    });
+                } else {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📭</div>
+                            <h3>No Applications Yet</h3>
+                            <p>You haven't applied for any scholarships yet. Check your eligibility first!</p>
+                            <a href="/">Check Eligibility</a>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">⚠️</div>
+                        <h3>Error Loading Applications</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+        
+        async function markFeedbackRead(appId) {
+            try {
+                await fetch(`/api/student/applications/${appId}/mark-feedback-read`, { method: 'POST' });
+            } catch (error) {
+                console.error('Error marking feedback as read:', error);
+            }
+        }
+        
+        function openUploadModal(appId, feedback) {
+            currentUploadAppId = appId;
+            document.getElementById('uploadAppId').value = appId;
+            document.getElementById('adminFeedback').innerHTML = `
+                <h5>📝 Admin's Request</h5>
+                <p>${feedback}</p>
+            `;
+            document.getElementById('uploadModal').classList.add('show');
+            loadUploadedDocuments(appId);
+        }
+        
+        function closeUploadModal() {
+            document.getElementById('uploadModal').classList.remove('show');
+            currentUploadAppId = null;
+        }
+        
+        async function loadUploadedDocuments(appId) {
+            const container = document.getElementById('uploadedDocs');
+            
+            try {
+                const response = await fetch(`/api/applications/${appId}/documents`);
+                const data = await response.json();
+                
+                if (data.success && data.documents.length > 0) {
+                    container.innerHTML = `
+                        <h4>📄 Uploaded Documents</h4>
+                        ${data.documents.map(doc => `
+                            <div class="doc-item">
+                                <div class="doc-info">
+                                    <span class="doc-icon">${getFileIcon(doc.file_type)}</span>
+                                    <span class="doc-name">${doc.filename}</span>
+                                    <span class="doc-badge">${doc.document_type}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    `;
+                } else {
+                    container.innerHTML = '';
+                }
+            } catch (error) {
+                container.innerHTML = '';
+            }
+        }
+        
+        async function uploadDocument() {
+            const appId = document.getElementById('uploadAppId').value;
+            const documentType = document.getElementById('documentType').value;
+            const fileInput = document.getElementById('documentFile');
+            
+            if (!fileInput.files[0]) {
+                showToast('Please select a file to upload', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('document', fileInput.files[0]);
+            formData.append('document_type', documentType);
+            
+            try {
+                const response = await fetch(`/api/student/applications/${appId}/upload-document`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Document uploaded successfully!', 'success');
+                    fileInput.value = '';
+                    loadUploadedDocuments(appId);
+                    loadApplications(); // Refresh the list
+                } else {
+                    showToast(data.error || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error uploading document', 'error');
+            }
+        }
+        
+        function getFileIcon(fileType) {
+            const icons = {
+                'pdf': '📕',
+                'doc': '📘',
+                'docx': '📘',
+                'jpg': '🖼️',
+                'jpeg': '🖼️',
+                'png': '🖼️'
+            };
+            return icons[fileType] || '📄';
+        }
+        
+        function getStatusLabel(status) {
+            const labels = {
+                'pending': '⏳ Pending',
+                'under_review': '🔍 Under Review',
+                'documents_requested': '📤 Docs Required',
+                'approved': '✅ Approved',
+                'rejected': '❌ Rejected'
+            };
+            return labels[status] || status;
+        }
+        
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-IN', { 
+                day: 'numeric', 
+                month: 'short', 
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed; top: 20px; right: 20px; padding: 15px 25px;
+                border-radius: 10px; z-index: 9999; animation: slideIn 0.3s ease;
+                ${type === 'success' ? 'background: #d1fae5; color: #065f46;' : 'background: #fee2e2; color: #991b1b;'}
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+    
+    <style>
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .status-documents_requested { background: #f3e8ff; color: #7c3aed; }
+    </style>
+</body>
+</html>

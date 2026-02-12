@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results - Scholarship Eligibility Filter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">🎓</span>
+            <h1>Scholarship Eligibility Filter</h1>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/">Apply</a></li>
+            <li><a href="/student/my-applications">My Applications</a></li>
+            <li><a href="/dashboard">Dashboard</a></li>
+        </ul>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            {% if session.student_picture %}
+            <img src="{{ session.student_picture }}" alt="Profile" style="width: 35px; height: 35px; border-radius: 50%; border: 2px solid #4f46e5;">
+            {% endif %}
+            <span style="color: #374151; font-weight: 500;">{{ session.student_name }}</span>
+            <a href="{{ url_for('student_logout') }}" style="background: #fee2e2; color: #991b1b; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; text-decoration: none; font-weight: 500;">🚪 Logout</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Results Header -->
+        <section class="results-header">
+            <h2>Eligibility Results</h2>
+            <div id="studentInfo" class="student-info-card">
+                <!-- Student info will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Summary Cards -->
+        <section class="summary-section">
+            <div class="summary-cards" id="summaryCards">
+                <!-- Summary will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Eligible Scholarships -->
+        <section class="results-section">
+            <h3 class="section-title eligible-title">✅ Eligible Scholarships</h3>
+            <div id="eligibleScholarships" class="results-list">
+                <!-- Eligible scholarships will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Not Eligible Scholarships -->
+        <section class="results-section">
+            <h3 class="section-title not-eligible-title">❌ Not Eligible Scholarships</h3>
+            <div id="notEligibleScholarships" class="results-list">
+                <!-- Not eligible scholarships will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Action Buttons -->
+        <section class="action-buttons">
+            <a href="/" class="btn btn-primary">Apply Again</a>
+            <a href="/dashboard" class="btn btn-secondary">View Dashboard</a>
+            <button onclick="window.print()" class="btn btn-outline">Print Results</button>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2024 Scholarship Eligibility Filter | Built with ❤️ for Education</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Get student ID from URL
+        const studentId = {{ student_id }};
+        
+        // Load results when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadResults();
+        });
+        
+        async function loadResults() {
+            try {
+                const response = await fetch(`/api/check-eligibility/${studentId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data.results);
+                } else {
+                    showError('Failed to load results');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error loading results. Please try again.');
+            }
+        }
+        
+        function displayResults(results) {
+            // Display student info
+            const student = results.student;
+            document.getElementById('studentInfo').innerHTML = `
+                <div class="student-details">
+                    <h4>${student.name}</h4>
+                    <p><strong>Email:</strong> ${student.email}</p>
+                    <p><strong>Course:</strong> ${student.course} (Year ${student.year_of_study})</p>
+                    <p><strong>Marks:</strong> ${student.marks_percentage}%</p>
+                    <p><strong>Family Income:</strong> ₹${student.family_income.toLocaleString()}</p>
+                    <p><strong>Category:</strong> ${student.category}</p>
+                </div>
+            `;
+            
+            // Display summary cards
+            document.getElementById('summaryCards').innerHTML = `
+                <div class="summary-card eligible-card">
+                    <div class="summary-icon">✅</div>
+                    <div class="summary-content">
+                        <h4>${results.eligible_count}</h4>
+                        <p>Eligible</p>
+                    </div>
+                </div>
+                <div class="summary-card not-eligible-card">
+                    <div class="summary-icon">❌</div>
+                    <div class="summary-content">
+                        <h4>${results.ineligible_count}</h4>
+                        <p>Not Eligible</p>
+                    </div>
+                </div>
+                <div class="summary-card amount-card">
+                    <div class="summary-icon">💰</div>
+                    <div class="summary-content">
+                        <h4>₹${results.total_eligible_amount.toLocaleString()}</h4>
+                        <p>Total Potential Amount</p>
+                    </div>
+                </div>
+            `;
+            
+            // Display eligible scholarships
+            const eligibleContainer = document.getElementById('eligibleScholarships');
+            if (results.eligible_scholarships.length === 0) {
+                eligibleContainer.innerHTML = `
+                    <div class="no-results">
+                        <p>😔 You are not eligible for any scholarships at this time.</p>
+                        <p>Please review the requirements and try again.</p>
+                    </div>
+                `;
+            } else {
+                eligibleContainer.innerHTML = results.eligible_scholarships.map(scholarship => `
+                    <div class="result-card eligible" id="scholarship-${scholarship.scholarship_id}">
+                        <div class="result-header">
+                            <h4>${scholarship.scholarship_name}</h4>
+                            <span class="amount">₹${scholarship.scholarship_amount.toLocaleString()}</span>
+                        </div>
+                        <p class="description">${scholarship.scholarship_description || 'No description available'}</p>
+                        <div class="priority-score">
+                            <span class="label">Priority Score:</span>
+                            <span class="score">${scholarship.priority_score}</span>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: ${Math.min(scholarship.priority_score, 100)}%"></div>
+                            </div>
+                        </div>
+                        <div class="result-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                            <div class="status-badge eligible-badge">✓ Eligible</div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="background: #d1fae5; color: #065f46; padding: 8px 16px; border-radius: 8px; font-weight: 500; font-size: 0.9rem;">
+                                    ✅ Application Submitted
+                                </span>
+                                <a href="/student/my-applications" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem; text-decoration: none;">
+                                    View Status →
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            // Display not eligible scholarships with reasons
+            const notEligibleContainer = document.getElementById('notEligibleScholarships');
+            if (results.ineligible_scholarships.length === 0) {
+                notEligibleContainer.innerHTML = `
+                    <div class="no-results success">
+                        <p>🎉 Great news! You are eligible for all available scholarships!</p>
+                    </div>
+                `;
+            } else {
+                notEligibleContainer.innerHTML = results.ineligible_scholarships.map(scholarship => `
+                    <div class="result-card not-eligible">
+                        <div class="result-header">
+                            <h4>${scholarship.scholarship_name}</h4>
+                            <span class="amount">₹${scholarship.scholarship_amount.toLocaleString()}</span>
+                        </div>
+                        <p class="description">${scholarship.scholarship_description || 'No description available'}</p>
+                        <div class="rejection-reasons">
+                            <h5>❌ Reasons for Ineligibility:</h5>
+                            <ul>
+                                ${scholarship.rejection_reasons.map(reason => `<li>${reason}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="status-badge not-eligible-badge">✗ Not Eligible</div>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        function showError(message) {
+            document.getElementById('studentInfo').innerHTML = `
+                <div class="error-message">
+                    <p>⚠️ ${message}</p>
+                    <a href="/" class="btn btn-primary">Go Back</a>
+                </div>
+            `;
+        }
+        
+        async function applyForScholarship(scholarshipId, scholarshipName) {
+            const btn = document.getElementById(`apply-btn-${scholarshipId}`);
+            const originalText = btn.innerHTML;
+            
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Applying...';
+                
+                const response = await fetch('/api/applications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ scholarship_id: scholarshipId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    btn.innerHTML = '✅ Applied!';
+                    btn.style.background = '#10b981';
+                    btn.disabled = true;
+                    
+                    // Show success message
+                    showNotification(`Successfully applied for ${scholarshipName}! The admin will review your application.`, 'success');
+                } else {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    
+                    if (response.status === 401) {
+                        showNotification('Please login to apply for scholarships', 'error');
+                        setTimeout(() => {
+                            window.location.href = '/student/login';
+                        }, 2000);
+                    } else {
+                        showNotification(data.error || 'Failed to apply', 'error');
+                    }
+                }
+            } catch (error) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                showNotification('Error applying for scholarship. Please try again.', 'error');
+            }
+        }
+        
+        function showNotification(message, type) {
+            // Remove existing notifications
+            const existing = document.querySelector('.notification');
+            if (existing) existing.remove();
+            
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <span>${type === 'success' ? '✅' : '⚠️'} ${message}</span>
+                <button onclick="this.parentElement.remove()">×</button>
+            `;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 10px;
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                z-index: 9999;
+                animation: slideIn 0.3s ease;
+                ${type === 'success' ? 'background: #d1fae5; color: #065f46;' : 'background: #fee2e2; color: #991b1b;'}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+    </script>
+    
+    <style>
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .notification button {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .notification button:hover { opacity: 1; }
+        .apply-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+    </style>
+</body>
+</html>

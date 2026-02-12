@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Users - Scholarship Eligibility Filter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .user-card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #e5e7eb;
+        }
+        
+        .user-avatar.no-image {
+            background: #4f46e5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-info h4 {
+            margin: 0 0 4px 0;
+            color: #1f2937;
+        }
+        
+        .user-info p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        
+        .user-badges {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .badge-super {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        
+        .badge-approved {
+            background: #d1fae5;
+            color: #059669;
+        }
+        
+        .badge-pending {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .user-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #4f46e5;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .mini-stat {
+            background: #fff;
+            padding: 16px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .mini-stat h3 {
+            font-size: 2rem;
+            color: #4f46e5;
+            margin: 0;
+        }
+        
+        .mini-stat p {
+            color: #6b7280;
+            margin: 4px 0 0 0;
+            font-size: 0.9rem;
+        }
+        .nav-badge { position: absolute; top: -8px; right: -10px; background: #ef4444; color: white; padding: 2px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">🎓</span>
+            <h1>Scholarship Eligibility Filter</h1>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/admin">Dashboard</a></li>
+            <li><a href="/admin/applications" style="position: relative;">📋 Applications <span id="nav-notification-badge" class="nav-badge" style="display:none;">0</span></a></li>
+            <li><a href="/admin/users" class="active">👥 Users</a></li>
+            <li><a href="/admin/logout" class="logout-btn">Logout</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container">
+        <a href="/admin" class="back-link">← Back to Admin Panel</a>
+        
+        <section class="admin-header">
+            <h2>👥 Admin Users Management</h2>
+            <p>Manage administrator accounts and permissions</p>
+        </section>
+        
+        <!-- Stats -->
+        <div class="stats-row" id="statsRow">
+            <div class="mini-stat">
+                <h3 id="totalAdmins">0</h3>
+                <p>Total Admins</p>
+            </div>
+            <div class="mini-stat">
+                <h3 id="approvedAdmins">0</h3>
+                <p>Approved</p>
+            </div>
+            <div class="mini-stat">
+                <h3 id="pendingAdmins">0</h3>
+                <p>Pending Approval</p>
+            </div>
+        </div>
+        
+        <!-- Users List -->
+        <section>
+            <h3>Registered Administrators</h3>
+            <div id="usersList">
+                <div class="loading">Loading users...</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2024 Scholarship Eligibility Filter | Built with ❤️ for Education</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', loadUsers);
+        
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users');
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayUsers(data.admins);
+                    updateStats(data.admins);
+                } else {
+                    document.getElementById('usersList').innerHTML = `
+                        <div class="error-alert">⚠️ ${data.error}</div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('usersList').innerHTML = `
+                    <div class="error-alert">⚠️ Failed to load users</div>
+                `;
+            }
+        }
+        
+        function updateStats(admins) {
+            document.getElementById('totalAdmins').textContent = admins.length;
+            document.getElementById('approvedAdmins').textContent = admins.filter(a => a.is_approved).length;
+            document.getElementById('pendingAdmins').textContent = admins.filter(a => !a.is_approved).length;
+        }
+        
+        function displayUsers(admins) {
+            const container = document.getElementById('usersList');
+            
+            if (admins.length === 0) {
+                container.innerHTML = `
+                    <div class="no-results">No admin users found</div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = admins.map(admin => `
+                <div class="user-card" data-id="${admin.id}">
+                    ${admin.profile_picture 
+                        ? `<img src="${admin.profile_picture}" alt="${admin.name}" class="user-avatar">`
+                        : `<div class="user-avatar no-image">${admin.name.charAt(0).toUpperCase()}</div>`
+                    }
+                    <div class="user-info">
+                        <h4>${admin.name}</h4>
+                        <p>${admin.email}</p>
+                        <div class="user-badges">
+                            ${admin.is_super_admin ? '<span class="badge badge-super">👑 Super Admin</span>' : ''}
+                            ${admin.is_approved 
+                                ? '<span class="badge badge-approved">✓ Approved</span>' 
+                                : '<span class="badge badge-pending">⏳ Pending</span>'
+                            }
+                        </div>
+                        <p style="margin-top: 8px; font-size: 0.8rem; color: #9ca3af;">
+                            Registered: ${admin.created_at || 'N/A'}
+                            ${admin.last_login ? ` | Last login: ${admin.last_login}` : ''}
+                        </p>
+                    </div>
+                    <div class="user-actions">
+                        ${!admin.is_approved && !admin.is_super_admin ? `
+                            <button class="btn btn-small btn-primary" onclick="approveAdmin(${admin.id})">
+                                ✓ Approve
+                            </button>
+                        ` : ''}
+                        ${admin.is_approved && !admin.is_super_admin ? `
+                            <button class="btn btn-small btn-secondary" onclick="revokeAdmin(${admin.id})">
+                                ✗ Revoke
+                            </button>
+                        ` : ''}
+                        ${!admin.is_super_admin ? `
+                            <button class="btn btn-small btn-danger" onclick="deleteAdmin(${admin.id})">
+                                🗑️ Delete
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        async function approveAdmin(adminId) {
+            if (!confirm('Approve this admin? They will be able to access the admin panel.')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/users/${adminId}/approve`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    loadUsers();
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to approve admin', 'error');
+            }
+        }
+        
+        async function revokeAdmin(adminId) {
+            if (!confirm('Revoke admin access? They will no longer be able to login.')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/users/${adminId}/revoke`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    loadUsers();
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to revoke access', 'error');
+            }
+        }
+        
+        async function deleteAdmin(adminId) {
+            if (!confirm('Delete this admin permanently? This action cannot be undone.')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/users/${adminId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    loadUsers();
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to delete admin', 'error');
+            }
+        }
+        
+        function showNotification(message, type) {
+            const existing = document.querySelector('.notification');
+            if (existing) existing.remove();
+            
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.innerHTML = `
+                <span>${type === 'error' ? '⚠️' : '✅'}</span>
+                <span>${message}</span>
+            `;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 16px 24px;
+                background: ${type === 'error' ? '#fee2e2' : '#d1fae5'};
+                color: ${type === 'error' ? '#dc2626' : '#059669'};
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                z-index: 1001;
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 4000);
+        }
+        
+        // Poll for notifications
+        function updateNotificationBadge() {
+            fetch('/api/admin/notifications/count')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const badge = document.getElementById('nav-notification-badge');
+                        if (data.count > 0) {
+                            badge.textContent = data.count;
+                            badge.style.display = 'inline';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                })
+                .catch(err => console.error('Error fetching notifications:', err));
+        }
+        updateNotificationBadge();
+        setInterval(updateNotificationBadge, 10000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Scholarship Eligibility Filter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">🎓</span>
+            <h1>Scholarship Eligibility Filter</h1>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/">Home</a></li>
+            <li><a href="/dashboard" class="active">Dashboard</a></li>
+            {% if session.get('student_logged_in') %}
+            <li><a href="/student/my-applications">My Applications</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container dashboard-container">
+        <!-- Dashboard Header -->
+        <section class="dashboard-header">
+            <h2>📊 Dashboard</h2>
+            <p>Overview of scholarship applications and eligibility statistics</p>
+            <button id="refreshBtn" class="btn btn-outline" onclick="loadDashboard()">🔄 Refresh</button>
+        </section>
+
+        <!-- Statistics Cards -->
+        <section class="stats-section">
+            <div class="stats-grid" id="statsGrid">
+                <!-- Stats will be loaded here -->
+                <div class="loading">Loading statistics...</div>
+            </div>
+        </section>
+
+        <!-- Scholarship Statistics -->
+        <section class="scholarship-stats-section">
+            <h3>📋 Scholarship-wise Statistics</h3>
+            <div id="scholarshipStats" class="scholarship-stats-grid">
+                <!-- Scholarship stats will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Top Priority Students -->
+        <section class="top-students-section">
+            <h3>🏆 Top Priority Students</h3>
+            <div class="table-container">
+                <table class="data-table" id="topStudentsTable">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Student Name</th>
+                            <th>Scholarship</th>
+                            <th>Marks</th>
+                            <th>Income</th>
+                            <th>Priority Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topStudentsBody">
+                        <!-- Data will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- All Students List -->
+        <section class="all-students-section">
+            <h3>👥 All Applicants</h3>
+            <div class="table-container">
+                <table class="data-table" id="allStudentsTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Course</th>
+                            <th>Year</th>
+                            <th>Marks</th>
+                            <th>Income</th>
+                            <th>Category</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allStudentsBody">
+                        <!-- Data will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2024 Scholarship Eligibility Filter | Built with ❤️ for Education</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Load dashboard data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboard();
+            loadAllStudents();
+        });
+        
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/dashboard/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayStats(data.stats);
+                    displayScholarshipStats(data.stats.scholarship_stats);
+                    displayTopStudents(data.stats.top_priority_students);
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+        
+        function displayStats(stats) {
+            document.getElementById('statsGrid').innerHTML = `
+                <div class="stat-card total">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-content">
+                        <h3>${stats.total_applicants}</h3>
+                        <p>Total Applicants</p>
+                    </div>
+                </div>
+                <div class="stat-card eligible">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-content">
+                        <h3>${stats.eligible_count}</h3>
+                        <p>Eligible Students</p>
+                    </div>
+                </div>
+                <div class="stat-card not-eligible">
+                    <div class="stat-icon">❌</div>
+                    <div class="stat-content">
+                        <h3>${stats.non_eligible_count}</h3>
+                        <p>Not Eligible</p>
+                    </div>
+                </div>
+                <div class="stat-card pending">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-content">
+                        <h3>${stats.not_checked_count}</h3>
+                        <p>Not Yet Checked</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function displayScholarshipStats(scholarshipStats) {
+            if (scholarshipStats.length === 0) {
+                document.getElementById('scholarshipStats').innerHTML = `
+                    <p class="no-data">No scholarships available</p>
+                `;
+                return;
+            }
+            
+            document.getElementById('scholarshipStats').innerHTML = scholarshipStats.map(scholarship => `
+                <div class="scholarship-stat-card">
+                    <h4>${scholarship.name}</h4>
+                    <div class="scholarship-stat-details">
+                        <p><strong>Amount:</strong> ₹${scholarship.amount.toLocaleString()}</p>
+                        <p><strong>Eligible:</strong> ${scholarship.eligible_count} students</p>
+                        <p><strong>Checked:</strong> ${scholarship.total_checked} applications</p>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${scholarship.total_checked > 0 ? (scholarship.eligible_count / scholarship.total_checked * 100) : 0}%"></div>
+                    </div>
+                    <small>${scholarship.total_checked > 0 ? Math.round(scholarship.eligible_count / scholarship.total_checked * 100) : 0}% eligibility rate</small>
+                </div>
+            `).join('');
+        }
+        
+        function displayTopStudents(topStudents) {
+            const tbody = document.getElementById('topStudentsBody');
+            
+            if (topStudents.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="no-data">No eligible students yet</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = topStudents.map((student, index) => `
+                <tr>
+                    <td><span class="rank-badge rank-${index + 1}">#${index + 1}</span></td>
+                    <td>${student.student_name}</td>
+                    <td>${student.scholarship_name}</td>
+                    <td>${student.marks}%</td>
+                    <td>₹${student.income.toLocaleString()}</td>
+                    <td><span class="priority-badge">${student.priority_score}</span></td>
+                </tr>
+            `).join('');
+        }
+        
+        async function loadAllStudents() {
+            try {
+                const response = await fetch('/api/students');
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayAllStudents(data.students);
+                }
+            } catch (error) {
+                console.error('Error loading students:', error);
+            }
+        }
+        
+        function displayAllStudents(students) {
+            const tbody = document.getElementById('allStudentsBody');
+            
+            if (students.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="no-data">No applicants yet. <a href="/">Apply now!</a></td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = students.map(student => `
+                <tr>
+                    <td>${student.id}</td>
+                    <td>${student.name}</td>
+                    <td>${student.course}</td>
+                    <td>${student.year_of_study}</td>
+                    <td>${student.marks_percentage}%</td>
+                    <td>₹${student.family_income.toLocaleString()}</td>
+                    <td>${student.category}</td>
+                    <td class="actions">
+                        <a href="/results/${student.id}" class="btn btn-small btn-primary">View Results</a>
+                        <button onclick="deleteStudent(${student.id})" class="btn btn-small btn-danger">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        async function deleteStudent(studentId) {
+            if (!confirm('Are you sure you want to delete this student?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/students/${studentId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    loadDashboard();
+                    loadAllStudents();
+                } else {
+                    alert('Failed to delete student: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error deleting student');
+            }
+        }
+    </script>
+</body>
+</html>

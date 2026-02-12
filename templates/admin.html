@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Scholarship Eligibility Filter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .admin-user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f8f9fa;
+            padding: 12px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .admin-user-info img {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: 2px solid #4f46e5;
+        }
+        .admin-user-info .no-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: #4f46e5;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+        .admin-user-details h4 {
+            margin: 0;
+            font-size: 1rem;
+        }
+        .admin-user-details p {
+            margin: 2px 0 0 0;
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+        .admin-user-details .super-badge {
+            display: inline-block;
+            background: #fef3c7;
+            color: #d97706;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .admin-user-info .manage-users-btn {
+            margin-left: auto;
+        }
+        .nav-badge { position: absolute; top: -8px; right: -10px; background: #ef4444; color: white; padding: 2px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+    </style>
+</head>
+<body>
+    <!-- Admin Navigation Bar -->
+    <nav class="navbar admin-navbar">
+        <div class="nav-brand">
+            <span class="logo">🎓</span>
+            <h1>Admin Panel</h1>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/admin" class="active">📊 Dashboard</a></li>
+            <li><a href="/admin/applications" style="position: relative;">📋 Applications <span id="nav-notification-badge" class="nav-badge" style="display:none;">0</span></a></li>
+            <li><a href="/admin/logout" class="logout-btn">🚪 Logout</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container admin-container">
+        <!-- Admin User Info -->
+        <div class="admin-user-info">
+            {% if admin_info.picture %}
+            <img src="{{ admin_info.picture }}" alt="{{ admin_info.name }}">
+            {% else %}
+            <div class="no-avatar">{{ admin_info.name[0] | upper }}</div>
+            {% endif %}
+            <div class="admin-user-details">
+                <h4>
+                    {{ admin_info.name }}
+                    {% if admin_info.is_super_admin %}
+                    <span class="super-badge">👑 Super Admin</span>
+                    {% endif %}
+                </h4>
+                <p>{{ admin_info.email }}</p>
+            </div>
+            <a href="/admin/applications" class="btn btn-primary btn-small" style="margin-left: auto; position: relative;">
+                📋 Applications
+                {% if admin_info.unread_applications > 0 %}
+                <span style="position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;">
+                    {{ admin_info.unread_applications }}
+                </span>
+                {% endif %}
+            </a>
+            {% if admin_info.is_super_admin %}
+            <a href="/admin/users" class="btn btn-secondary btn-small manage-users-btn">👥 Manage Admins</a>
+            {% endif %}
+        </div>
+
+        <!-- Admin Header -->
+        <section class="admin-header">
+            <h2>⚙️ Admin Panel</h2>
+            <p>Manage scholarships and eligibility rules without changing code</p>
+        </section>
+
+        <!-- Tabs -->
+        <div class="admin-tabs">
+            <button class="tab-btn active" onclick="switchTab('scholarships')">📋 Scholarships</button>
+            <button class="tab-btn" onclick="switchTab('rules')">📏 Rules</button>
+            <button class="tab-btn" onclick="switchTab('create')">➕ Create New</button>
+        </div>
+
+        <!-- Scholarships Tab -->
+        <section id="scholarships-tab" class="tab-content active">
+            <div class="section-header">
+                <h3>Manage Scholarships</h3>
+                <button onclick="switchTab('create')" class="btn btn-primary">+ Add Scholarship</button>
+            </div>
+            
+            <div id="scholarshipsList" class="admin-list">
+                <!-- Scholarships will be loaded here -->
+                <div class="loading">Loading scholarships...</div>
+            </div>
+        </section>
+
+        <!-- Rules Tab -->
+        <section id="rules-tab" class="tab-content">
+            <div class="section-header">
+                <h3>Manage Rules</h3>
+            </div>
+            
+            <div class="filter-section">
+                <label for="scholarshipFilter">Filter by Scholarship:</label>
+                <select id="scholarshipFilter" onchange="filterRules()">
+                    <option value="">All Scholarships</option>
+                </select>
+            </div>
+            
+            <div id="rulesList" class="admin-list">
+                <!-- Rules will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Create Tab -->
+        <section id="create-tab" class="tab-content">
+            <div class="create-forms">
+                <!-- Create Scholarship Form -->
+                <div class="create-form-card">
+                    <h3>➕ Create New Scholarship</h3>
+                    <form id="createScholarshipForm">
+                        <div class="form-group">
+                            <label for="scholarshipName">Scholarship Name *</label>
+                            <input type="text" id="scholarshipName" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="scholarshipDesc">Description</label>
+                            <textarea id="scholarshipDesc" name="description" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="scholarshipAmount">Amount (₹) *</label>
+                            <input type="number" id="scholarshipAmount" name="amount" min="0" required>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="scholarshipActive" name="is_active" checked>
+                                <span class="checkmark"></span>
+                                Active
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Scholarship</button>
+                    </form>
+                </div>
+
+                <!-- Create Rule Form -->
+                <div class="create-form-card">
+                    <h3>📏 Add New Rule</h3>
+                    <form id="createRuleForm">
+                        <div class="form-group">
+                            <label for="ruleScholarship">Select Scholarship *</label>
+                            <select id="ruleScholarship" name="scholarship_id" required>
+                                <option value="">Select Scholarship</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ruleField">Field to Check *</label>
+                            <select id="ruleField" name="field" required>
+                                <option value="">Select Field</option>
+                                <option value="marks_percentage">Marks Percentage</option>
+                                <option value="family_income">Family Income</option>
+                                <option value="has_backlogs">Has Backlogs</option>
+                                <option value="is_full_time">Is Full-time Student</option>
+                                <option value="category">Category</option>
+                                <option value="year_of_study">Year of Study</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ruleOperator">Operator *</label>
+                            <select id="ruleOperator" name="operator" required>
+                                <option value="">Select Operator</option>
+                                <option value=">=">≥ (Greater than or equal)</option>
+                                <option value="<=">≤ (Less than or equal)</option>
+                                <option value="==">= (Equal to)</option>
+                                <option value="!=">≠ (Not equal to)</option>
+                                <option value=">">＞ (Greater than)</option>
+                                <option value="<">＜ (Less than)</option>
+                                <option value="in">IN (In list - for categories)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ruleValue">Value *</label>
+                            <input type="text" id="ruleValue" name="value" required>
+                            <small>For boolean fields: true/false. For 'in' operator: comma-separated values (e.g., SC,ST)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="ruleWeight">Weight (Priority)</label>
+                            <input type="number" id="ruleWeight" name="weight" value="1.0" step="0.1" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="ruleDescription">Description</label>
+                            <input type="text" id="ruleDescription" name="description" placeholder="E.g., Minimum marks requirement">
+                        </div>
+                        <div class="form-group">
+                            <label for="ruleError">Error Message (shown when rule fails)</label>
+                            <input type="text" id="ruleError" name="error_message" placeholder="E.g., Marks below required percentage">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Rule</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Edit Scholarship Modal -->
+    <div id="editScholarshipModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('editScholarshipModal')">&times;</span>
+            <h3>Edit Scholarship</h3>
+            <form id="editScholarshipForm">
+                <input type="hidden" id="editScholarshipId">
+                <div class="form-group">
+                    <label for="editScholarshipName">Scholarship Name *</label>
+                    <input type="text" id="editScholarshipName" required>
+                </div>
+                <div class="form-group">
+                    <label for="editScholarshipDesc">Description</label>
+                    <textarea id="editScholarshipDesc" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editScholarshipAmount">Amount (₹) *</label>
+                    <input type="number" id="editScholarshipAmount" min="0" required>
+                </div>
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="editScholarshipActive">
+                        <span class="checkmark"></span>
+                        Active
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">Update Scholarship</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Rule Modal -->
+    <div id="editRuleModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('editRuleModal')">&times;</span>
+            <h3>Edit Rule</h3>
+            <form id="editRuleForm">
+                <input type="hidden" id="editRuleId">
+                <div class="form-group">
+                    <label for="editRuleField">Field *</label>
+                    <select id="editRuleField" required>
+                        <option value="marks_percentage">Marks Percentage</option>
+                        <option value="family_income">Family Income</option>
+                        <option value="has_backlogs">Has Backlogs</option>
+                        <option value="is_full_time">Is Full-time Student</option>
+                        <option value="category">Category</option>
+                        <option value="year_of_study">Year of Study</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editRuleOperator">Operator *</label>
+                    <select id="editRuleOperator" required>
+                        <option value=">=">≥ (Greater than or equal)</option>
+                        <option value="<=">≤ (Less than or equal)</option>
+                        <option value="==">= (Equal to)</option>
+                        <option value="!=">≠ (Not equal to)</option>
+                        <option value=">">＞ (Greater than)</option>
+                        <option value="<">＜ (Less than)</option>
+                        <option value="in">IN (In list)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editRuleValue">Value *</label>
+                    <input type="text" id="editRuleValue" required>
+                </div>
+                <div class="form-group">
+                    <label for="editRuleWeight">Weight</label>
+                    <input type="number" id="editRuleWeight" step="0.1" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="editRuleDescription">Description</label>
+                    <input type="text" id="editRuleDescription">
+                </div>
+                <div class="form-group">
+                    <label for="editRuleError">Error Message</label>
+                    <input type="text" id="editRuleError">
+                </div>
+                <button type="submit" class="btn btn-primary">Update Rule</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2024 Scholarship Eligibility Filter | Built with ❤️ for Education</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+    <script>
+        // Poll for notifications every 10 seconds
+        function updateNotificationBadge() {
+            fetch('/api/admin/notifications/count')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const badge = document.getElementById('nav-notification-badge');
+                        if (data.count > 0) {
+                            badge.textContent = data.count;
+                            badge.style.display = 'inline';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                })
+                .catch(err => console.error('Error fetching notifications:', err));
+        }
+        
+        // Initial load
+        updateNotificationBadge();
+        
+        // Poll every 10 seconds
+        setInterval(updateNotificationBadge, 10000);
+    </script>
+</body>
+</html>

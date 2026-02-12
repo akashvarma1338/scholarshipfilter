@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scholarship Applications - Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
+        .page-header h2 { margin: 0; color: #1e293b; }
+        .filter-tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+        .filter-tab { padding: 10px 20px; border: 2px solid #e5e7eb; border-radius: 8px; background: white; cursor: pointer; font-weight: 500; transition: all 0.3s ease; }
+        .filter-tab:hover { border-color: #6366f1; }
+        .filter-tab.active { background: #6366f1; color: white; border-color: #6366f1; }
+        .notification-badge { background: #ef4444; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; margin-left: 5px; }
+        .applications-list { display: grid; gap: 20px; }
+        .application-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border-left: 4px solid #e5e7eb; }
+        .application-card.unread { border-left-color: #6366f1; background: #fafafa; }
+        .application-card.pending { border-left-color: #f59e0b; }
+        .application-card.under_review { border-left-color: #3b82f6; }
+        .application-card.approved { border-left-color: #10b981; }
+        .application-card.rejected { border-left-color: #ef4444; }
+        .application-card.documents_requested { border-left-color: #8b5cf6; }
+        .app-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .student-info { display: flex; align-items: center; gap: 12px; }
+        .student-avatar { width: 45px; height: 45px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .student-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .student-details h4 { margin: 0 0 3px 0; color: #1e293b; }
+        .student-details p { margin: 0; color: #64748b; font-size: 0.9rem; }
+        .app-meta { display: flex; gap: 20px; margin: 15px 0; flex-wrap: wrap; }
+        .meta-item { display: flex; align-items: center; gap: 5px; color: #64748b; font-size: 0.9rem; }
+        .status-select { padding: 8px 15px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; cursor: pointer; }
+        .status-select:focus { outline: none; border-color: #6366f1; }
+        .app-actions { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .btn-sm { padding: 8px 16px; font-size: 0.85rem; border-radius: 6px; cursor: pointer; border: none; font-weight: 500; transition: all 0.3s ease; }
+        .btn-approve { background: #10b981; color: white; }
+        .btn-approve:hover { background: #059669; }
+        .btn-reject { background: #ef4444; color: white; }
+        .btn-reject:hover { background: #dc2626; }
+        .btn-review { background: #3b82f6; color: white; }
+        .btn-review:hover { background: #2563eb; }
+        .btn-docs { background: #8b5cf6; color: white; }
+        .btn-docs:hover { background: #7c3aed; }
+        .btn-view-docs { background: #06b6d4; color: white; }
+        .btn-view-docs:hover { background: #0891b2; }
+        .notes-input { width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px; margin-top: 10px; resize: vertical; min-height: 60px; }
+        .notes-input:focus { outline: none; border-color: #6366f1; }
+        .empty-state { text-align: center; padding: 60px 20px; background: #f8fafc; border-radius: 16px; }
+        .empty-state .icon { font-size: 4rem; margin-bottom: 20px; }
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; color: #6366f1; text-decoration: none; margin-bottom: 20px; font-weight: 500; }
+        .timestamp { font-size: 0.8rem; color: #94a3b8; }
+        .nav-badge { position: absolute; top: -8px; right: -10px; background: #ef4444; color: white; padding: 2px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        
+        /* Student Details Section */
+        .student-full-details { background: #f8fafc; border-radius: 10px; padding: 15px; margin: 15px 0; }
+        .student-full-details h5 { margin: 0 0 12px 0; color: #374151; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .student-full-details h5:hover { color: #4f46e5; }
+        .details-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+        .detail-item { background: white; padding: 10px 12px; border-radius: 8px; }
+        .detail-item label { display: block; font-size: 0.75rem; color: #6b7280; margin-bottom: 3px; text-transform: uppercase; }
+        .detail-item span { font-weight: 500; color: #1f2937; }
+        .details-content { display: none; }
+        .details-content.show { display: block; }
+        
+        /* Feedback Section */
+        .feedback-section { background: #fef3c7; border-radius: 10px; padding: 15px; margin: 15px 0; border: 1px solid #fcd34d; }
+        .feedback-section h5 { margin: 0 0 10px 0; color: #92400e; }
+        .feedback-input { width: 100%; padding: 10px; border: 2px solid #fcd34d; border-radius: 8px; resize: vertical; min-height: 80px; background: white; }
+        
+        /* Documents Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: white; border-radius: 16px; padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b; }
+        .doc-list { display: grid; gap: 10px; }
+        .doc-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; background: #f8fafc; border-radius: 8px; }
+        .doc-info { display: flex; align-items: center; gap: 10px; }
+        .doc-icon { font-size: 1.5rem; }
+        .doc-name { font-weight: 500; }
+        .doc-meta { font-size: 0.8rem; color: #64748b; }
+        .doc-badge { background: #e0e7ff; color: #4338ca; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+    <!-- Admin Navigation Bar -->
+    <nav class="navbar admin-navbar">
+        <div class="nav-brand">
+            <span class="logo">🎓</span>
+            <h1>Admin Panel</h1>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/admin">📊 Dashboard</a></li>
+            <li><a href="/admin/applications" class="active" style="position: relative;">📋 Applications <span id="nav-notification-badge" class="nav-badge" style="display:none;">0</span></a></li>
+            <li><a href="/admin/logout" class="logout-btn">🚪 Logout</a></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        <a href="{{ url_for('admin_panel') }}" class="back-btn">← Back to Admin Panel</a>
+        
+        <div class="page-header">
+            <h2>📋 Scholarship Applications</h2>
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="all">All <span id="count-all" class="notification-badge" style="display:none;">0</span></button>
+                <button class="filter-tab" data-filter="pending">Pending <span id="count-pending" class="notification-badge" style="display:none;">0</span></button>
+                <button class="filter-tab" data-filter="documents_requested">Docs Requested</button>
+                <button class="filter-tab" data-filter="under_review">Under Review</button>
+                <button class="filter-tab" data-filter="approved">Approved</button>
+                <button class="filter-tab" data-filter="rejected">Rejected</button>
+            </div>
+        </div>
+        
+        <div class="applications-list" id="applicationsList">
+            <div class="loading">Loading applications...</div>
+        </div>
+    </main>
+    
+    <!-- Documents Modal -->
+    <div class="modal" id="documentsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📄 Uploaded Documents</h3>
+                <button class="modal-close" onclick="closeDocumentsModal()">&times;</button>
+            </div>
+            <div class="doc-list" id="documentsList">
+                <p>Loading documents...</p>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>© 2024 Scholarship Eligibility Filter | Built with ❤️ for Education</p>
+    </footer>
+
+    <script>
+        let allApplications = [];
+        let currentFilter = 'all';
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadApplications();
+            
+            // Filter tabs
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    currentFilter = this.dataset.filter;
+                    renderApplications();
+                });
+            });
+            
+            // Poll for new notifications every 10 seconds
+            setInterval(checkForNewApplications, 10000);
+        });
+        
+        async function checkForNewApplications() {
+            try {
+                const response = await fetch('/api/admin/notifications/count');
+                const data = await response.json();
+                if (data.success) {
+                    const badge = document.getElementById('nav-notification-badge');
+                    if (data.count > 0) {
+                        badge.textContent = data.count;
+                        badge.style.display = 'inline';
+                        // Reload applications if there are new ones
+                        const prevUnread = allApplications.filter(a => !a.is_read).length;
+                        if (data.count > prevUnread) {
+                            loadApplications();
+                        }
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking notifications:', error);
+            }
+        }
+        
+        async function loadApplications() {
+            try {
+                const response = await fetch('/api/admin/applications');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allApplications = data.applications;
+                    updateCounts();
+                    renderApplications();
+                }
+            } catch (error) {
+                document.getElementById('applicationsList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">⚠️</div>
+                        <h3>Error Loading Applications</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function updateCounts() {
+            const pending = allApplications.filter(a => a.status === 'pending').length;
+            const unread = allApplications.filter(a => !a.is_read).length;
+            
+            // Update nav badge
+            const navBadge = document.getElementById('nav-notification-badge');
+            if (unread > 0) {
+                navBadge.textContent = unread;
+                navBadge.style.display = 'inline';
+                document.getElementById('count-all').textContent = unread;
+                document.getElementById('count-all').style.display = 'inline';
+            } else {
+                navBadge.style.display = 'none';
+                document.getElementById('count-all').style.display = 'none';
+            }
+            if (pending > 0) {
+                document.getElementById('count-pending').textContent = pending;
+                document.getElementById('count-pending').style.display = 'inline';
+            } else {
+                document.getElementById('count-pending').style.display = 'none';
+            }
+        }
+        
+        function renderApplications() {
+            const container = document.getElementById('applicationsList');
+            let filtered = allApplications;
+            
+            if (currentFilter !== 'all') {
+                filtered = allApplications.filter(a => a.status === currentFilter);
+            }
+            
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <h3>No Applications</h3>
+                        <p>No applications found for the selected filter.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = filtered.map(app => {
+                const s = app.student_details || {};
+                return `
+                <div class="application-card ${app.status} ${!app.is_read ? 'unread' : ''}" id="app-${app.id}">
+                    <div class="app-header">
+                        <div class="student-info">
+                            <div class="student-avatar">
+                                ${app.student_picture ? `<img src="${app.student_picture}" alt="">` : '👤'}
+                            </div>
+                            <div class="student-details">
+                                <h4>${app.student_name}</h4>
+                                <p>${app.student_email}</p>
+                            </div>
+                        </div>
+                        <span class="timestamp">Applied: ${formatDate(app.applied_at)}</span>
+                    </div>
+                    
+                    <!-- Student Full Details (Expandable) -->
+                    <div class="student-full-details">
+                        <h5 onclick="toggleDetails(${app.id})">
+                            <span id="toggle-icon-${app.id}">▶</span> View Complete Student Details
+                        </h5>
+                        <div class="details-content" id="details-${app.id}">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <label>Course</label>
+                                    <span>${s.course || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Year of Study</label>
+                                    <span>${s.year_of_study || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Marks Percentage</label>
+                                    <span>${s.marks_percentage ? s.marks_percentage + '%' : 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Family Income</label>
+                                    <span>₹${s.family_income ? s.family_income.toLocaleString() : 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Category</label>
+                                    <span>${s.category || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Has Backlogs</label>
+                                    <span>${s.has_backlogs ? '❌ Yes' : '✅ No'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Full-Time Student</label>
+                                    <span>${s.is_full_time ? '✅ Yes' : '❌ No'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Registered On</label>
+                                    <span>${formatDate(s.created_at)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="app-meta">
+                        <div class="meta-item">🎓 <strong>${app.scholarship_name}</strong></div>
+                        <div class="meta-item">💰 ₹${app.scholarship_amount?.toLocaleString() || 'N/A'}</div>
+                        <div class="meta-item">📊 Status: <strong>${getStatusLabel(app.status)}</strong></div>
+                        ${app.document_count > 0 ? `<div class="meta-item">📎 <strong>${app.document_count} Document(s)</strong></div>` : ''}
+                    </div>
+                    
+                    <!-- Admin Notes -->
+                    <textarea class="notes-input" id="notes-${app.id}" placeholder="Add admin notes...">${app.admin_notes || ''}</textarea>
+                    
+                    <!-- Request Documents Section -->
+                    <div class="feedback-section">
+                        <h5>📝 Request Documents from Student</h5>
+                        <textarea class="feedback-input" id="feedback-${app.id}" placeholder="Describe which documents are required (e.g., Income Certificate, Marksheet, Caste Certificate)...">${app.admin_feedback || ''}</textarea>
+                        <button class="btn-sm btn-docs" style="margin-top: 10px;" onclick="requestDocuments(${app.id})">
+                            📤 Send Document Request
+                        </button>
+                    </div>
+                    
+                    <div class="app-actions">
+                        <button class="btn-sm btn-approve" onclick="updateStatus(${app.id}, 'approved')">✅ Approve</button>
+                        <button class="btn-sm btn-review" onclick="updateStatus(${app.id}, 'under_review')">🔍 Under Review</button>
+                        <button class="btn-sm btn-reject" onclick="updateStatus(${app.id}, 'rejected')">❌ Reject</button>
+                        ${app.document_count > 0 ? `<button class="btn-sm btn-view-docs" onclick="viewDocuments(${app.id})">📄 View Documents (${app.document_count})</button>` : ''}
+                    </div>
+                </div>
+            `}).join('');
+            
+            // Mark unread as read
+            filtered.filter(a => !a.is_read).forEach(app => {
+                markAsRead(app.id);
+            });
+        }
+        
+        function toggleDetails(appId) {
+            const details = document.getElementById(`details-${appId}`);
+            const icon = document.getElementById(`toggle-icon-${appId}`);
+            if (details.classList.contains('show')) {
+                details.classList.remove('show');
+                icon.textContent = '▶';
+            } else {
+                details.classList.add('show');
+                icon.textContent = '▼';
+            }
+        }
+        
+        async function requestDocuments(appId) {
+            const feedback = document.getElementById(`feedback-${appId}`).value;
+            
+            if (!feedback.trim()) {
+                showToast('Please specify which documents are required', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/applications/${appId}/request-documents`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ feedback: feedback })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const app = allApplications.find(a => a.id === appId);
+                    if (app) {
+                        app.status = 'documents_requested';
+                        app.admin_feedback = feedback;
+                        app.documents_requested = true;
+                    }
+                    renderApplications();
+                    showToast('Document request sent to student!', 'success');
+                } else {
+                    showToast(data.error || 'Failed to send request', 'error');
+                }
+            } catch (error) {
+                showToast('Error sending document request', 'error');
+            }
+        }
+        
+        async function viewDocuments(appId) {
+            const modal = document.getElementById('documentsModal');
+            const docList = document.getElementById('documentsList');
+            
+            modal.classList.add('show');
+            docList.innerHTML = '<p>Loading documents...</p>';
+            
+            try {
+                const response = await fetch(`/api/applications/${appId}/documents`);
+                const data = await response.json();
+                
+                if (data.success && data.documents.length > 0) {
+                    docList.innerHTML = data.documents.map(doc => `
+                        <div class="doc-item">
+                            <div class="doc-info">
+                                <span class="doc-icon">${getFileIcon(doc.file_type)}</span>
+                                <div>
+                                    <div class="doc-name">${doc.filename}</div>
+                                    <div class="doc-meta">${formatFileSize(doc.file_size)} • ${formatDate(doc.uploaded_at)}</div>
+                                </div>
+                                <span class="doc-badge">${doc.document_type}</span>
+                            </div>
+                            <a href="/api/documents/${doc.id}/download" class="btn-sm btn-review" target="_blank">⬇️ Download</a>
+                        </div>
+                    `).join('');
+                } else {
+                    docList.innerHTML = '<p>No documents uploaded yet.</p>';
+                }
+            } catch (error) {
+                docList.innerHTML = '<p>Error loading documents.</p>';
+            }
+        }
+        
+        function closeDocumentsModal() {
+            document.getElementById('documentsModal').classList.remove('show');
+        }
+        
+        function getFileIcon(fileType) {
+            const icons = {
+                'pdf': '📕',
+                'doc': '📘',
+                'docx': '📘',
+                'jpg': '🖼️',
+                'jpeg': '🖼️',
+                'png': '🖼️'
+            };
+            return icons[fileType] || '📄';
+        }
+        
+        function formatFileSize(bytes) {
+            if (!bytes) return 'Unknown size';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        async function markAsRead(appId) {
+            try {
+                await fetch(`/api/admin/applications/${appId}/read`, { method: 'POST' });
+            } catch (error) {
+                console.error('Error marking as read:', error);
+            }
+        }
+        
+        async function updateStatus(appId, newStatus) {
+            const notes = document.getElementById(`notes-${appId}`).value;
+            
+            try {
+                const response = await fetch(`/api/admin/applications/${appId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus, notes: notes })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update local data
+                    const app = allApplications.find(a => a.id === appId);
+                    if (app) {
+                        app.status = newStatus;
+                        app.admin_notes = notes;
+                    }
+                    
+                    renderApplications();
+                    showToast(`Application ${newStatus}!`, 'success');
+                } else {
+                    showToast(data.error || 'Failed to update', 'error');
+                }
+            } catch (error) {
+                showToast('Error updating application', 'error');
+            }
+        }
+        
+        function getStatusLabel(status) {
+            const labels = {
+                'pending': 'Pending',
+                'under_review': 'Under Review',
+                'documents_requested': '📤 Docs Requested',
+                'approved': 'Approved',
+                'rejected': 'Rejected'
+            };
+            return labels[status] || status;
+        }
+        
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-IN', { 
+                day: 'numeric', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+        }
+        
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed; top: 20px; right: 20px; padding: 15px 25px;
+                border-radius: 10px; z-index: 9999; animation: slideIn 0.3s ease;
+                ${type === 'success' ? 'background: #d1fae5; color: #065f46;' : 'background: #fee2e2; color: #991b1b;'}
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+    
+    <style>
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</body>
+</html>
