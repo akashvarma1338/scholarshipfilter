@@ -473,6 +473,96 @@ def delete_rule(rule_id):
     fdb.RuleDB.delete(rule_id)
     return jsonify({'success': True, 'message': 'Rule deleted successfully'})
 
+@app.route('/api/admin/applications', methods=['GET'])
+@admin_required
+def get_admin_applications():
+    try:
+        applications = fdb.ApplicationDB.get_all()
+        result = []
+        for app in applications:
+            student = fdb.StudentDB.get_by_id(app['student_id'])
+            scholarship = fdb.ScholarshipDB.get_by_id(app['scholarship_id'])
+            documents = fdb.DocumentDB.get_by_application(app['id'])
+            
+            result.append({
+                'id': app['id'],
+                'student_id': app['student_id'],
+                'student_name': student.get('name', 'Unknown') if student else 'Unknown',
+                'student_email': student.get('email', '') if student else '',
+                'student_details': student,
+                'scholarship_id': app['scholarship_id'],
+                'scholarship_name': scholarship.get('name', 'Unknown') if scholarship else 'Unknown',
+                'scholarship_amount': scholarship.get('amount', 0) if scholarship else 0,
+                'status': app.get('status', 'pending'),
+                'admin_notes': app.get('admin_notes'),
+                'admin_feedback': app.get('admin_feedback'),
+                'documents_requested': app.get('documents_requested', False),
+                'applied_at': app.get('applied_at'),
+                'reviewed_at': app.get('reviewed_at'),
+                'is_read': app.get('is_read', False),
+                'document_count': len(documents)
+            })
+        
+        return jsonify({'success': True, 'applications': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/applications/<app_id>/status', methods=['PUT'])
+@admin_required
+def update_application_status(app_id):
+    try:
+        data = request.get_json()
+        fdb.ApplicationDB.update(app_id, {
+            'status': data['status'],
+            'admin_notes': data.get('notes'),
+            'reviewed_at': fdb.to_timestamp(),
+            'reviewed_by': session.get('admin_id')
+        })
+        return jsonify({'success': True, 'message': 'Application updated'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/applications/<app_id>/read', methods=['POST'])
+@admin_required
+def mark_application_read(app_id):
+    try:
+        fdb.ApplicationDB.update(app_id, {'is_read': True})
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/applications/<app_id>/request-documents', methods=['POST'])
+@admin_required
+def request_documents(app_id):
+    try:
+        data = request.get_json()
+        fdb.ApplicationDB.update(app_id, {
+            'status': 'documents_requested',
+            'admin_feedback': data.get('feedback'),
+            'documents_requested': True,
+            'feedback_sent_at': fdb.to_timestamp()
+        })
+        return jsonify({'success': True, 'message': 'Document request sent'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/notifications/count', methods=['GET'])
+@admin_required
+def get_notification_count():
+    try:
+        count = fdb.ApplicationDB.count_unread()
+        return jsonify({'success': True, 'count': count})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/applications/<app_id>/documents', methods=['GET'])
+def get_application_documents(app_id):
+    try:
+        documents = fdb.DocumentDB.get_by_application(app_id)
+        return jsonify({'success': True, 'documents': documents})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.errorhandler(404)
 def not_found(error):
     if request.path.startswith('/api/'):
