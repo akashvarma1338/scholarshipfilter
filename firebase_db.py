@@ -16,7 +16,15 @@ def init_firebase():
         firebase_admin.get_app()
     except ValueError:
         try:
-            if os.path.exists(config.FIREBASE_CREDENTIALS_PATH):
+            # Try environment variable first (for Render deployment)
+            firebase_creds = os.environ.get('FIREBASE_CREDENTIALS')
+            if firebase_creds:
+                cred_dict = json.loads(firebase_creds)
+                cred = credentials.Certificate(cred_dict)
+                firebase_admin.initialize_app(cred, {
+                    'databaseURL': config.FIREBASE_CONFIG['databaseURL']
+                })
+            elif os.path.exists(config.FIREBASE_CREDENTIALS_PATH):
                 cred = credentials.Certificate(config.FIREBASE_CREDENTIALS_PATH)
                 firebase_admin.initialize_app(cred, {
                     'databaseURL': config.FIREBASE_CONFIG['databaseURL']
