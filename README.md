@@ -89,36 +89,7 @@ eduhack/
    - Dashboard: http://localhost:5000/dashboard
    - Admin Panel: http://localhost:5000/admin
 
-## 🔐 Admin Authentication (Google OAuth)
-
-The admin panel uses **Google OAuth 2.0** for authentication. Here's how it works:
-
-### Setting Up Google OAuth
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Navigate to **APIs & Services** > **Credentials**
-4. Click **Create Credentials** > **OAuth Client ID**
-5. Select **Web Application**
-6. Add authorized redirect URI: `http://localhost:5000/admin/google/callback`
-7. Copy the **Client ID** and **Client Secret**
-
-### Configure the Application
-
-Set environment variables or update `config.py`:
-```python
-GOOGLE_CLIENT_ID = 'your-client-id.apps.googleusercontent.com'
-GOOGLE_CLIENT_SECRET = 'your-client-secret'
-```
-
-### Demo Mode
-
-By default, `DEMO_MODE = True` in config.py, which:
-- Auto-approves all new admin registrations
-- First registered admin becomes Super Admin
-
-Set `DEMO_MODE = False` for production to require Super Admin approval for new registrations.
-
+## 🔐 Admin Authentication
 ### Admin Roles
 
 - **Super Admin**: First registered admin, can approve/revoke other admins
